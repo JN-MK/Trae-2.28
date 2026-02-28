@@ -1,0 +1,15 @@
+{
+  "name": "ai-life-coach",
+  "version": "1.0.0",
+  "description": "A life coach chat application powered by DeepSeek R1 via Volcengine",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "JN-MK <1064434865@qq.com>",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.2"
+  }
+}
