@@ -90,7 +90,12 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// 启动服务器
-app.listen(PORT, () => {
-    console.log(`服务器运行在 http://localhost:${PORT}`);
-});
+// 导出 app 供 Vercel Serverless 使用
+module.exports = app;
+
+// 仅在本地运行时启动监听
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`服务器运行在 http://localhost:${PORT}`);
+    });
+}

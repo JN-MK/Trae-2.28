@@ -53,7 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // 3. 发送请求到后端
-            const response = await fetch('http://localhost:3001/api/chat', {
+            // 使用相对路径，适配本地和生产环境
+            const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
