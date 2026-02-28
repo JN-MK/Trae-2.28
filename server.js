@@ -2,9 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
+require('dotenv').config();
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3000;
 
 // 启用 CORS，允许前端跨域请求
 app.use(cors());
@@ -14,7 +15,11 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
 // API 配置
-const API_KEY = "f2519d58-27dc-44a4-8dae-c5a8c04850b5";
+// 优先从环境变量获取，如果没有则报错或提示
+const API_KEY = process.env.ARK_API_KEY;
+if (!API_KEY) {
+    console.error("错误: 未找到 ARK_API_KEY 环境变量。请在 .env 文件或 Vercel 环境变量中设置。");
+}
 const API_URL = "https://ark.cn-beijing.volces.com/api/v3/chat/completions";
 
 // 处理聊天请求的路由
