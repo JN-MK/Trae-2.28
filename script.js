@@ -3,8 +3,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('user-input');
     const sendBtn = document.getElementById('send-btn');
     const loadingIndicator = document.querySelector('.loading-indicator');
+    
+    // New Elements
+    const moodBtns = document.querySelectorAll('.mood-btn');
+    const currentMoodDisplay = document.getElementById('current-mood-display');
+    const clearHistoryBtn = document.getElementById('clear-history-btn');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const analysisModal = document.getElementById('analysis-modal');
+    const closeModal = document.querySelector('.close-modal');
+    const analysisResult = document.getElementById('analysis-result');
 
     let history = []; // 保存对话历史
+    let currentMood = ''; // 当前心情
+
+    // 1. 初始化：加载历史记录
+    loadHistory();
 
     // 自动调整输入框高度
     userInput.addEventListener('input', () => {
@@ -21,12 +34,83 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    async function sendMessage() {
-        const message = userInput.value.trim();
-        if (!message) return;
+    // 2. 心情选择逻辑
+    moodBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // 移除其他按钮的选中状态
+            moodBtns.forEach(b => b.classList.remove('selected'));
+            // 选中当前按钮
+            btn.classList.add('selected');
+            currentMood = btn.dataset.mood;
+            currentMoodDisplay.textContent = `已选: ${currentMood}`;
+        });
+    });
 
-        // 1. 添加用户消息到界面
-        appendMessage('user', message);
+    // 3. 清除历史记录逻辑
+    clearHistoryBtn.addEventListener('click', () => {
+        if (confirm('确定要清除所有聊天记录吗？此操作无法撤销。')) {
+            localStorage.removeItem('chatHistory');
+            history = [];
+            // 清空界面，只保留系统欢迎语
+            const systemMsg = chatContainer.querySelector('.system-message');
+            chatContainer.innerHTML = '';
+            if (systemMsg) chatContainer.appendChild(systemMsg);
+        }
+    });
+
+    // 4. 分析报告逻辑
+    analyzeBtn.addEventListener('click', async () => {
+        analysisModal.style.display = 'block';
+        analysisResult.textContent = '正在深入分析您的对话记录，请稍候...';
+        
+        try {
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ history: history })
+            });
+            
+            const data = await response.json();
+            if (data.error) {
+                analysisResult.textContent = '分析失败: ' + data.error;
+            } else {
+                // 简单的 Markdown 渲染 (粗体和换行)
+                let html = formatMessage(data.analysis);
+                // 增强 Markdown 渲染: 处理 **加粗**
+                html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                analysisResult.innerHTML = html;
+            }
+        } catch (error) {
+            analysisResult.textContent = '网络请求出错，无法生成报告。';
+        }
+    });
+
+    // 关闭模态框
+    closeModal.addEventListener('click', () => {
+        analysisModal.style.display = 'none';
+    });
+    window.addEventListener('click', (e) => {
+        if (e.target == analysisModal) {
+            analysisModal.style.display = 'none';
+        }
+    });
+
+
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        // 如果选择了心情，附加到消息中（但在界面上只显示文本）
+        let messageToSend = text;
+        if (currentMood) {
+            messageToSend = `[用户当前心情: ${currentMood}] ${text}`;
+            // 发送后重置心情选择，或者保留？通常保留比较好，或者让用户每次选。
+            // 这里我们选择不重置，除非用户自己改。
+        }
+
+        // 1. 添加用户消息到界面 (只显示文本，不显示心情标签，保持界面整洁)
+        appendMessage('user', text); // 界面显示原始文本
+        
         userInput.value = '';
         userInput.style.height = 'auto';
         sendBtn.disabled = true;
@@ -53,14 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // 3. 发送请求到后端
-            // 使用相对路径，适配本地和生产环境
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    message: message,
+                    message: messageToSend, // 发送带心情的消息
                     history: history
                 })
             });
@@ -117,9 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 更新历史记录
-            history.push({ role: 'user', content: message });
+            // 更新历史记录 (保存带心情的完整上下文吗？还是只保存文本？)
+            // 为了让 AI 记住上下文，我们保存实际发送的内容 messageToSend
+            history.push({ role: 'user', content: messageToSend });
             history.push({ role: 'assistant', content: fullResponse });
+            
+            // 5. 保存到本地存储
+            saveHistory();
 
         } catch (error) {
             console.error('发送消息出错:', error);
@@ -164,5 +251,41 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
         return safeText.replace(/\n/g, '<br>');
+    }
+
+    // --- History Management ---
+
+    function saveHistory() {
+        localStorage.setItem('chatHistory', JSON.stringify(history));
+    }
+
+    function loadHistory() {
+        const savedHistory = localStorage.getItem('chatHistory');
+        if (savedHistory) {
+            try {
+                history = JSON.parse(savedHistory);
+                // 恢复界面显示
+                history.forEach(msg => {
+                    // 对于用户消息，如果包含心情前缀，可以选择去除前缀显示，或者直接显示
+                    // 为了美观，我们尝试去除 [用户当前心情: xxx] 前缀
+                    let displayText = msg.content;
+                    if (msg.role === 'user') {
+                        displayText = displayText.replace(/^\[用户当前心情: .*?\] /, '');
+                    }
+                    
+                    // 只有非系统消息才显示（虽然 history 里目前没存 system，但以防万一）
+                    if (msg.role !== 'system') {
+                        // 对于 AI 消息，我们需要区分 reasoning 和 content
+                        // 但是目前的 history 结构只存了最终 content，丢失了 reasoning
+                        // 如果想恢复 reasoning，需要修改 history 结构。
+                        // 目前简化处理，只恢复最终回复。
+                        appendMessage(msg.role === 'assistant' ? 'ai' : 'user', displayText);
+                    }
+                });
+            } catch (e) {
+                console.error("加载历史记录失败", e);
+                history = [];
+            }
+        }
     }
 });

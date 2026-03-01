@@ -12,7 +12,13 @@ app.use(cors());
 // 解析 JSON 请求体
 app.use(express.json());
 // 托管静态文件 (前端页面)
-app.use(express.static(path.join(__dirname, '.')));
+// 使用绝对路径确保在不同环境下都能正确找到文件
+app.use(express.static(__dirname));
+
+// 根路由，明确返回 index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // API 配置
 // 优先从环境变量获取，如果没有则报错或提示
@@ -87,6 +93,62 @@ app.post('/api/chat', async (req, res) => {
         } else {
             res.end();
         }
+    }
+});
+
+// 处理分析请求的路由
+app.post('/api/analyze', async (req, res) => {
+    const { history } = req.body;
+
+    // 过滤掉系统消息，只保留用户和助手的对话
+    const userHistory = history.filter(msg => msg.role !== 'system');
+    
+    // 如果历史记录太少，直接返回提示
+    if (userHistory.length < 4) {
+        return res.json({ analysis: "对话记录较少，暂时无法生成深入的分析报告。请多和我聊聊吧！" });
+    }
+
+    // 构建分析专用的提示词
+    const messages = [
+        { 
+            role: "system", 
+            content: `你是一位资深的心理咨询师和人生教练。请根据以下的对话历史，为用户生成一份简短的"成长分析报告"。
+请包含以下内容：
+1. **当前状态**：分析用户的情绪状态和主要关注点。
+2. **潜在模式**：识别用户思维或行为中重复出现的模式（积极或消极）。
+3. **成长建议**：给出3条具体、可执行的建议，帮助用户突破当前局限。
+请保持语气专业、温暖且富有洞察力。使用 Markdown 格式输出。` 
+        },
+        {
+            role: "user",
+            content: `以下是我们之前的对话记录：\n${JSON.stringify(userHistory)}\n\n请根据以上内容为我生成分析报告。`
+        }
+    ];
+
+    try {
+        const response = await axios.post(
+            API_URL,
+            {
+                model: "deepseek-r1-250528",
+                messages: messages,
+                stream: false, // 分析报告不需要流式，一次性返回即可
+                temperature: 0.7
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`
+                },
+                timeout: 60000 
+            }
+        );
+
+        const analysis = response.data.choices[0].message.content;
+        res.json({ analysis });
+
+    } catch (error) {
+        console.error("分析请求出错:", error.message);
+        res.status(500).json({ error: "无法生成分析报告，请稍后再试。" });
     }
 });
 

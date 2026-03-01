@@ -13,6 +13,10 @@
         <header>
             <h1>AI Life Coach</h1>
             <p>与 DeepSeek R1 对话，探索更好的自己</p>
+            <div class="header-controls">
+                <button id="clear-history-btn" title="清除历史记录">🗑️ 清除</button>
+                <button id="analyze-btn" title="分析我的成长">📊 生成成长报告</button>
+            </div>
         </header>
 
         <main id="chat-container">
@@ -23,7 +27,25 @@
             <!-- 聊天记录将动态插入到这里 -->
         </main>
 
+        <!-- 分析报告模态框 -->
+        <div id="analysis-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>📈 你的成长分析报告</h2>
+                <div id="analysis-result">正在生成分析中，请稍候...</div>
+            </div>
+        </div>
+
         <div class="input-area">
+            <div class="mood-selector">
+                <span>此刻心情:</span>
+                <button class="mood-btn" data-mood="开心" title="开心">😄</button>
+                <button class="mood-btn" data-mood="平静" title="平静">😌</button>
+                <button class="mood-btn" data-mood="焦虑" title="焦虑">😰</button>
+                <button class="mood-btn" data-mood="低落" title="低落">😔</button>
+                <button class="mood-btn" data-mood="愤怒" title="愤怒">😠</button>
+                <span id="current-mood-display"></span>
+            </div>
             <div class="input-wrapper">
                 <textarea id="user-input" placeholder="输入你想聊的话题..." rows="1"></textarea>
                 <button id="send-btn">
